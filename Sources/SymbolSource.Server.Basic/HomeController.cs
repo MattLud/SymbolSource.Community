@@ -28,19 +28,25 @@ namespace SymbolSource.Server.Basic
     {
         private string GetAbsoluteUrl(string relativeUrl)
         {
-            return Request.Url.GetLeftPart(UriPartial.Authority) + Request.ApplicationPath.TrimEnd('/') + relativeUrl;
+            var left = Request.Url.GetLeftPart(UriPartial.Authority);
+            return left + relativeUrl;
+        }
+
+        private string GetAppPath()
+        {
+            return Request.ApplicationPath == "/" ? "/" : Request.ApplicationPath+"/"; 
         }
 
         public ActionResult Index()
         {
             return View(new InfoViewModel
                 {
-                    VisualStudioUrl = GetAbsoluteUrl("/WinDbg/pdb"),
-                    NuGetPushUrl = GetAbsoluteUrl("/NuGet"),
-                    OpenWrapUrl = GetAbsoluteUrl("/OpenWrap"),
+                    VisualStudioUrl = GetAbsoluteUrl(GetAppPath()+"WinDbg/pdb"),
+                    NuGetPushUrl = GetAbsoluteUrl(GetAppPath() + "NuGet"),
+                    OpenWrapUrl = GetAbsoluteUrl(GetAppPath() + "OpenWrap"),
                     SrcSrvPathTest = Directory.Exists(ConfigurationManager.AppSettings["SrcSrvPath"]) ? "OK" : "Directory not found",
-                    NuGetSmokeTest = InlineTest("/NuGet/FeedService.mvc"),
-                    OpenWrapSmokeTest = InlineTest("/OpenWrap/index.wraplist"),
+                    NuGetSmokeTest = InlineTest(GetAppPath() + "NuGet/FeedService.mvc"),
+                    OpenWrapSmokeTest = InlineTest(GetAppPath() + "OpenWrap/index.wraplist"),
                     NuGetPushTest = InlineTest(Url.Action("NuGetPushTest")),
                     NuGetFeedTest = InlineTest(Url.Action("NuGetFeedTest")),
                     OpenWrapPushTest = InlineTest(Url.Action("OpenWrapPushTest")),
@@ -87,15 +93,17 @@ namespace SymbolSource.Server.Basic
         {
             var helper = new Gateway.NuGet.Core.TestHelper();
             using (var stream = GetType().Assembly.GetManifestResourceStream(GetType().Namespace + ".Packages.DemoLibrary.nupkg"))
-                helper.Push(GetAbsoluteUrl("/NuGet"), "Test", stream);
-
+            {
+                var url = GetAbsoluteUrl(GetAppPath() + "NuGet");
+                helper.Push(url, "Test", stream);
+            }
             return Content("OK");
         }
 
         public ActionResult NuGetFeedTest()
         {
             var helper = new Gateway.NuGet.Core.TestHelper();
-            var count = helper.Count(GetAbsoluteUrl("/NuGet/FeedService.mvc"), new NetworkCredential("Test", "Test"));
+            var count = helper.Count(GetAbsoluteUrl(GetAppPath() + "NuGet/FeedService.mvc"), new NetworkCredential("Test", "Test"));
             return Content(string.Format("{0} packages", count));
         }
 
@@ -103,7 +111,7 @@ namespace SymbolSource.Server.Basic
         {
             var helper = new Gateway.OpenWrap.Core.TestHelper();
             using (var stream = GetType().Assembly.GetManifestResourceStream(GetType().Namespace + ".Packages.demolibrary.wrap"))
-                helper.Push(GetAbsoluteUrl("/OpenWrap"), new NetworkCredential("Test", "Test"), "Test", stream);
+                helper.Push(GetAbsoluteUrl(GetAppPath() + "OpenWrap"), new NetworkCredential("Test", "Test"), "Test", stream);
 
             return Content("OK");
         }
@@ -111,7 +119,7 @@ namespace SymbolSource.Server.Basic
         public ActionResult OpenWrapFeedTest()
         {
             var helper = new Gateway.OpenWrap.Core.TestHelper();
-            var count = helper.Count(GetAbsoluteUrl("/OpenWrap"), new NetworkCredential("Test", "Test"));
+            var count = helper.Count(GetAbsoluteUrl(GetAppPath() + "OpenWrap"), new NetworkCredential("Test", "Test"));
             return Content(string.Format("{0} packages", count));
         }
     }
