@@ -45,8 +45,8 @@ namespace SymbolSource.Server.Basic
                     NuGetPushUrl = GetAbsoluteUrl(GetAppPath() + "NuGet"),
                     OpenWrapUrl = GetAbsoluteUrl(GetAppPath() + "OpenWrap"),
                     SrcSrvPathTest = Directory.Exists(ConfigurationManager.AppSettings["SrcSrvPath"]) ? "OK" : "Directory not found",
-                    NuGetSmokeTest = InlineTest(GetAppPath() + "NuGet/FeedService.mvc"),
-                    OpenWrapSmokeTest = InlineTest(GetAppPath() + "OpenWrap/index.wraplist"),
+                    NuGetSmokeTest = InlineTest(Url.Action("SmokeTest", new { url = "NuGet/FeedService.mvc" })),
+                    OpenWrapSmokeTest = InlineTest(Url.Action("SmokeTest", new { url = "OpenWrap/index.wraplist" })),
                     NuGetPushTest = InlineTest(Url.Action("NuGetPushTest")),
                     NuGetFeedTest = InlineTest(Url.Action("NuGetFeedTest")),
                     OpenWrapPushTest = InlineTest(Url.Action("OpenWrapPushTest")),
@@ -56,12 +56,13 @@ namespace SymbolSource.Server.Basic
 
         private KeyValuePair<string, string> InlineTest(string url)
         {
-            url = GetAbsoluteUrl(Url.Action("SmokeTest", new { url } ));
+            url = GetAbsoluteUrl(url);
+
             using (var client = new WebClient())
             {
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
-                var result = client.DownloadString(url);
+                var result = DownloadString(url);
                 stopwatch.Stop();
                 result = result.Substring(0, Math.Min(20, result.Length));
                 result = string.Format("{0} ({1} ms)", result, stopwatch.ElapsedMilliseconds);
@@ -69,24 +70,29 @@ namespace SymbolSource.Server.Basic
             }
         }
 
-        public ActionResult SmokeTest(string url)
+        private string DownloadString(string url)
         {
-            url = GetAbsoluteUrl(url);
-
             try
             {
                 using (var client = new WebClient())
-                    client.DownloadData(url);
-                
-                return Content("OK");
+                    return client.DownloadString(url);
             }
             catch (WebException e)
             {
-                var result = (HttpWebResponse)e.Response;
+                var result = (HttpWebResponse) e.Response;
                 using (var stream = result.GetResponseStream())
-                using (var reader = new StreamReader(stream, string.IsNullOrEmpty(result.ContentEncoding) ? Encoding.UTF8 : Encoding.GetEncoding(result.ContentEncoding)))
-                    return Content(string.Format("{0} - {1}\n\n{2}", result.StatusCode, result.StatusDescription, reader.ReadToEnd()));
+                using (
+                    var reader = new StreamReader(stream, string.IsNullOrEmpty(result.ContentEncoding) ? Encoding.UTF8 : Encoding.GetEncoding(result.ContentEncoding)))
+                    return string.Format("{0} - {1}\n\n{2}", result.StatusCode, result.StatusDescription, reader.ReadToEnd());
             }
+        }
+
+        public ActionResult SmokeTest(string url)
+        {
+            using (var client = new WebClient())
+                client.DownloadData(GetAbsoluteUrl(GetAppPath() + url));
+
+            return Content("OK");
         }
 
         public ActionResult NuGetPushTest()
@@ -104,7 +110,7 @@ namespace SymbolSource.Server.Basic
         {
             var helper = new Gateway.NuGet.Core.TestHelper();
             var count = helper.Count(GetAbsoluteUrl(GetAppPath() + "NuGet/FeedService.mvc"), new NetworkCredential("Test", "Test"));
-            return Content(string.Format("{0} packages", count));
+            return Content(string.Format("OK - {0} package(s)", count));
         }
 
         public ActionResult OpenWrapPushTest()
@@ -120,7 +126,7 @@ namespace SymbolSource.Server.Basic
         {
             var helper = new Gateway.OpenWrap.Core.TestHelper();
             var count = helper.Count(GetAbsoluteUrl(GetAppPath() + "OpenWrap"), new NetworkCredential("Test", "Test"));
-            return Content(string.Format("{0} packages", count));
+            return Content(string.Format("OK - {0} package(s)", count));
         }
     }
 }
